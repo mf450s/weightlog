@@ -1,53 +1,63 @@
-import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-} from "react-native";
+import React, { useState } from "react";
+import { View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet } from "react-native";
 import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { Colors } from "../lib/colors";
-import { Settings } from "../lib/types";
-import { getLocalSettings, saveLocalSettings } from "../lib/storage";
-import { fetchSettings, updateSettings } from "../lib/api";
-import { Card, ActionButton } from "../components/ui";
-
-const c = Colors.dark;
+import { Colors as c } from "../lib/colors";
+import type { UserRead } from "../lib/types";
+import { getMe, updateMe, updatePassword, deleteAccount, logout, getCurrentUser } from "../lib/api";
+import { Card, Section, Btn, Input } from "../components/ui";
 
 export default function SettingsScreen() {
-  const [settings, setSettings] = useState<Settings>({
-    height_cm: null,
-    target_weight: null,
-    unit: "kg",
-  });
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<UserRead | null>(getCurrentUser());
+  const [name, setName] = useState(user?.name ?? "");
+  const [email, setEmail] = useState(user?.email ?? "");
 
-  useEffect(() => {
-    (async () => {
-      const local = await getLocalSettings();
-      setSettings(local);
-      try {
-        const api = await fetchSettings();
-        setSettings(api);
-      } catch {}
-      setLoading(false);
-    })();
-  }, []);
+  // Password change
+  const [showPw, setShowPw] = useState(false);
+  const [currentPw, setCurrentPw] = useState("");
+  const [newPw, setNewPw] = useState("");
 
-  const handleSave = async () => {
-    await saveLocalSettings(settings);
+  const handleUpdateProfile = async () => {
     try {
-      await updateSettings(settings);
-    } catch {}
-    router.back();
+      const u = await updateMe({ name: name.trim(), email: email.trim() });
+      setUser(u);
+      Alert.alert("Saved", "Profile updated.");
+    } catch (e: any) { Alert.alert("Error", e.message); }
   };
 
-  const toggleUnit = () => {
-    setSettings((s) => ({ ...s, unit: s.unit === "kg" ? "lbs" : "kg" }));
+  const handleChangePassword = async () => {
+    if (!currentPw || !newPw) { Alert.alert("Error", "Fill both fields."); return; }
+    try {
+      await updatePassword({ current_password: currentPw, new_password: newPw });
+      Alert.alert("Done", "Password changed.");
+      setCurrentPw(""); setNewPw(""); setShowPw(false);
+    } catch (e: any) { Alert.alert("Error", e.message); }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    router.replace("/");
+  };
+
+  const handleDelete = () => {
+    Alert.alert("Delete Account", "This permanently deletes all your data. Enter your password to confirm.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => {
+          Alert.prompt
+            ? Alert.prompt("Password", "Enter your password", [
+                { text: "Cancel", style: "cancel" },
+                { text: "Delete", style: "destructive", onPress: async (pw: string) => {
+                  try { await deleteAccount(pw); router.replace("/"); } catch (e: any) { Alert.alert("Error", e.message); }
+                }},
+              ], "secure-text")
+            : Alert.alert("Error", "Prompt not supported.");
+        },
+      },
+    ]);
   };
 
   return (
@@ -60,75 +70,45 @@ export default function SettingsScreen() {
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView
-        contentContainerStyle={{ padding: 16 }}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* Unit */}
-        <Card style={{ marginBottom: 12 }}>
-          <Text style={styles.label}>Weight Unit</Text>
-          <TouchableOpacity style={styles.unitToggle} onPress={toggleUnit}>
-            <Text
-              style={[
-                styles.unitOption,
-                settings.unit === "kg" && styles.unitActive,
-              ]}
-            >
-              kg
-            </Text>
-            <Text
-              style={[
-                styles.unitOption,
-                settings.unit === "lbs" && styles.unitActive,
-              ]}
-            >
-              lbs
-            </Text>
-          </TouchableOpacity>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+        {/* Profile */}
+        <Card style={{ marginBottom: 16 }}>
+          <Section title="Profile">
+            <Text style={styles.label}>Name</Text>
+            <Input value={name} onChange={setName} style={{ marginBottom: 12 }} />
+            <Text style={styles.label}>Email</Text>
+            <Input value={email} onChange={setEmail} keyboardType="email-address" style={{ marginBottom: 12 }} />
+            <Btn label="Save" onPress={handleUpdateProfile} />
+          </Section>
         </Card>
 
-        {/* Height */}
-        <Card style={{ marginBottom: 12 }}>
-          <Text style={styles.label}>Height (cm)</Text>
-          <Text style={styles.hint}>Used for BMI calculation</Text>
-          <TextInput
-            style={styles.input}
-            value={settings.height_cm ? String(settings.height_cm) : ""}
-            onChangeText={(v) =>
-              setSettings((s) => ({
-                ...s,
-                height_cm: v ? parseFloat(v) || null : null,
-              }))
-            }
-            placeholder="e.g. 178"
-            placeholderTextColor={c.border}
-            keyboardType="numeric"
-            maxLength={3}
-          />
+        {/* Password */}
+        <Card style={{ marginBottom: 16 }}>
+          <Section title="Password">
+            {!showPw ? (
+              <Btn label="Change Password" variant="ghost" onPress={() => setShowPw(true)} />
+            ) : (
+              <View>
+                <Input value={currentPw} onChange={setCurrentPw} placeholder="Current password" secure style={{ marginBottom: 8 }} />
+                <Input value={newPw} onChange={setNewPw} placeholder="New password (min 8 chars)" secure style={{ marginBottom: 12 }} />
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  <View style={{ flex: 1 }}><Btn label="Update" onPress={handleChangePassword} /></View>
+                  <View style={{ flex: 1 }}><Btn label="Cancel" variant="ghost" onPress={() => { setShowPw(false); setCurrentPw(""); setNewPw(""); }} /></View>
+                </View>
+              </View>
+            )}
+          </Section>
         </Card>
 
-        {/* Target weight */}
-        <Card style={{ marginBottom: 12 }}>
-          <Text style={styles.label}>Target Weight ({settings.unit})</Text>
-          <Text style={styles.hint}>Track progress toward your goal</Text>
-          <TextInput
-            style={styles.input}
-            value={settings.target_weight ? String(settings.target_weight) : ""}
-            onChangeText={(v) =>
-              setSettings((s) => ({
-                ...s,
-                target_weight: v ? parseFloat(v) || null : null,
-              }))
-            }
-            placeholder={settings.unit === "kg" ? "e.g. 75" : "e.g. 165"}
-            placeholderTextColor={c.border}
-            keyboardType="numeric"
-            maxLength={5}
-          />
+        {/* Actions */}
+        <Card style={{ marginBottom: 16 }}>
+          <Section title="Account">
+            <Btn label="Log Out" variant="secondary" onPress={handleLogout} />
+            <View style={{ marginTop: 12 }}>
+              <Btn label="Delete Account" variant="danger" onPress={handleDelete} />
+            </View>
+          </Section>
         </Card>
-
-        <ActionButton label="Save Settings" onPress={handleSave} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -136,51 +116,7 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12 },
   title: { fontSize: 20, fontWeight: "700", color: c.text },
-  label: {
-    color: c.text,
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 4,
-  },
-  hint: {
-    color: c.textDim,
-    fontSize: 12,
-    marginBottom: 12,
-  },
-  input: {
-    backgroundColor: c.surface2,
-    color: c.text,
-    fontSize: 18,
-    fontWeight: "600",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 10,
-  },
-  unitToggle: {
-    flexDirection: "row",
-    backgroundColor: c.surface2,
-    borderRadius: 10,
-    padding: 3,
-  },
-  unitOption: {
-    flex: 1,
-    textAlign: "center",
-    paddingVertical: 10,
-    fontSize: 16,
-    fontWeight: "600",
-    color: c.textDim,
-    borderRadius: 8,
-  },
-  unitActive: {
-    backgroundColor: c.accent,
-    color: "#0A0A0A",
-  },
+  label: { color: c.textDim, fontSize: 12, fontWeight: "600", marginBottom: 4, textTransform: "uppercase" },
 });

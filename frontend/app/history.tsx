@@ -1,74 +1,36 @@
 import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-  StyleSheet,
-} from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl, StyleSheet } from "react-native";
 import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { format, parseISO } from "date-fns";
-import { Colors } from "../lib/colors";
-import { WeightEntry } from "../lib/types";
-import { getLocalEntries, saveLocalEntries, removeLocalEntry } from "../lib/storage";
-import { fetchEntries, deleteEntry } from "../lib/api";
-import { WeightChart } from "../components/WeightChart";
-import { Card } from "../components/ui";
-
-const c = Colors.dark;
-const DAYS = [7, 30, 90, 365];
+import { Colors as c } from "../lib/colors";
+import type { WorkoutSession, WorkoutTemplate } from "../lib/types";
+import { listSessions, listTemplates } from "../lib/api";
+import { Card, Section, StatRow } from "../components/ui";
 
 export default function HistoryScreen() {
-  const [entries, setEntries] = useState<WeightEntry[]>([]);
-  const [days, setDays] = useState(30);
+  const [sessions, setSessions] = useState<WorkoutSession[]>([]);
+  const [templates, setTemplates] = useState<WorkoutTemplate[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      const local = await getLocalEntries();
-      setEntries(local);
-      try {
-        const api = await fetchEntries();
-        setEntries(api);
-      } catch {}
-    })();
-  }, []);
-
-  const handleDelete = (entry: WeightEntry) => {
-    Alert.alert("Delete entry?", `${entry.date} — ${entry.weight} kg`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await deleteEntry(entry.id);
-          } catch {}
-          await removeLocalEntry(entry.id);
-          setEntries((prev) => prev.filter((e) => e.id !== entry.id));
-        },
-      },
-    ]);
+  const load = async () => {
+    const [s, t] = await Promise.all([listSessions(200), listTemplates()]);
+    setSessions(s.filter((x) => !x.active_session));
+    setTemplates(t);
   };
 
-  if (entries.length === 0) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="chevron-back" size={24} color={c.text} />
-          </TouchableOpacity>
-          <Text style={styles.title}>History</Text>
-          <View style={{ width: 24 }} />
-        </View>
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-          <Text style={{ color: c.textDim, fontSize: 16 }}>No entries yet</Text>
-        </View>
-      </SafeAreaView>
-    );
+  useEffect(() => { load(); }, []);
+  const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
+
+  // Group by month
+  const grouped = new Map<string, WorkoutSession[]>();
+  for (const s of sessions) {
+    const month = s.performed_at.slice(0, 7);
+    if (!grouped.has(month)) grouped.set(month, []);
+    grouped.get(month)!.push(s);
   }
+
+  const totalVolume = sessions.length; // simplified — real volume needs sets
 
   return (
     <SafeAreaView style={styles.container}>
@@ -80,82 +42,48 @@ export default function HistoryScreen() {
         <View style={{ width: 24 }} />
       </View>
 
-      {/* Time range selector */}
-      <View style={styles.rangeRow}>
-        {DAYS.map((d) => (
-          <TouchableOpacity
-            key={d}
-            style={[styles.rangeBtn, days === d && styles.rangeBtnActive]}
-            onPress={() => setDays(d)}
-          >
-            <Text
-              style={[
-                styles.rangeText,
-                days === d && styles.rangeTextActive,
-              ]}
-            >
-              {d === 365 ? "1Y" : `${d}D`}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Chart */}
-      <Card style={{ marginHorizontal: 16, marginBottom: 12 }}>
-        <WeightChart entries={entries} days={days} />
-      </Card>
-
-      {/* Entry list */}
       <ScrollView
-        style={{ flex: 1, paddingHorizontal: 16 }}
-        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ padding: 16 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}
       >
-        {entries
-          .filter((e) => {
-            const cutoff = new Date();
-            cutoff.setDate(cutoff.getDate() - days);
-            return e.date >= cutoff.toISOString().split("T")[0];
-          })
-          .map((entry, i) => {
-            const prev =
-              i < entries.length - 1 ? entries[i + 1]?.weight : null;
-            const diff = prev !== null ? entry.weight - prev : null;
+        <Card style={{ marginBottom: 16 }}>
+          <StatRow
+            items={[
+              { label: "Total Sessions", value: String(sessions.length) },
+              { label: "This Month", value: String(sessions.filter((s) => s.performed_at.slice(0, 7) === new Date().toISOString().slice(0, 7)).length) },
+              { label: "Templates", value: String(templates.length) },
+            ]}
+          />
+        </Card>
 
-            return (
-              <View key={entry.id} style={styles.entryRow}>
+        {[...grouped.entries()].map(([month, monthSessions]) => (
+          <Section key={month} title={new Date(month + "-01").toLocaleDateString("de-DE", { month: "long", year: "numeric" })}>
+            {monthSessions.map((s) => (
+              <TouchableOpacity
+                key={s.id}
+                style={styles.row}
+                onPress={() => router.push(`/session/${s.id}`)}
+              >
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.entryDate}>
-                    {format(parseISO(entry.date), "EEE, dd MMM yyyy")}
+                  <Text style={{ color: c.text, fontSize: 15, fontWeight: "600" }}>
+                    {new Date(s.performed_at).toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "short" })}
                   </Text>
-                  {entry.note ? (
-                    <Text style={styles.entryNote}>{entry.note}</Text>
-                  ) : null}
-                </View>
-                <View style={{ alignItems: "flex-end" }}>
-                  <Text style={styles.entryWeight}>{entry.weight} kg</Text>
-                  {diff !== null && diff !== 0 && (
-                    <Text
-                      style={{
-                        color: diff < 0 ? c.accent : c.accent2,
-                        fontSize: 12,
-                        fontWeight: "600",
-                      }}
-                    >
-                      {diff > 0 ? "+" : ""}
-                      {diff.toFixed(1)} kg
+                  {s.template_id && (
+                    <Text style={{ color: c.accent, fontSize: 12 }}>
+                      {templates.find((t) => t.id === s.template_id)?.name ?? "Template"}
                     </Text>
                   )}
                 </View>
-                <TouchableOpacity
-                  style={{ marginLeft: 10 }}
-                  onPress={() => handleDelete(entry)}
-                >
-                  <Ionicons name="trash-outline" size={16} color={c.textDim} />
-                </TouchableOpacity>
-              </View>
-            );
-          })}
-        <View style={{ height: 40 }} />
+                <Text style={{ color: c.textDim, fontSize: 13 }}>
+                  {s.started_at && s.ended_at
+                    ? `${Math.round((new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()) / 60000)}m`
+                    : ""}
+                </Text>
+                <Ionicons name="chevron-forward" size={16} color={c.textDim} style={{ marginLeft: 8 }} />
+              </TouchableOpacity>
+            ))}
+          </Section>
+        ))}
       </ScrollView>
     </SafeAreaView>
   );
@@ -163,37 +91,7 @@ export default function HistoryScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12 },
   title: { fontSize: 20, fontWeight: "700", color: c.text },
-  rangeRow: {
-    flexDirection: "row",
-    paddingHorizontal: 16,
-    marginBottom: 12,
-    gap: 8,
-  },
-  rangeBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: c.surface,
-  },
-  rangeBtnActive: { backgroundColor: c.accent },
-  rangeText: { color: c.textDim, fontSize: 14, fontWeight: "600" },
-  rangeTextActive: { color: "#0A0A0A" },
-  entryRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: c.border,
-  },
-  entryDate: { color: c.text, fontSize: 15, fontWeight: "500" },
-  entryNote: { color: c.textDim, fontSize: 12, marginTop: 2 },
-  entryWeight: { color: c.text, fontSize: 18, fontWeight: "700" },
+  row: { flexDirection: "row", alignItems: "center", paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border },
 });

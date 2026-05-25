@@ -1,50 +1,44 @@
-# WeightLog
+# OpenWeights — Mobile Frontend
 
-Minimalist weight tracking app. Offline-first, ship-ready.
+Expo (React Native) frontend for the [openweightsbackend](https://github.com/mf450s/openweightsbackend) workout tracker.
 
-**Backend:** FastAPI + SQLite  
-**Frontend:** Expo (React Native) — iOS + Android
+iOS + Android. Dark, minimal, gym-ready.
+
+## Backend
+
+This is the **frontend only**. The backend lives at:
+https://github.com/mf450s/openweightsbackend (branch: `development`)
 
 ## Quick Start
 
-### Backend
-```bash
-cd backend
-pip install -r requirements.txt
-python main.py
-# → http://localhost:8001
-```
-
-### Frontend
 ```bash
 cd frontend
 npm install
 npx expo start
 ```
 
-## API Endpoints
+Configure the backend URL in `lib/api.ts` (`BASE` constant). Defaults to `localhost:8000` (iOS) / `10.0.2.2:8000` (Android).
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/health` | Health check |
-| POST | `/api/entries` | Create entry |
-| GET | `/api/entries` | List entries (paginated, filterable) |
-| GET | `/api/entries/{id}` | Get single entry |
-| PUT | `/api/entries/{id}` | Update entry |
-| DELETE | `/api/entries/{id}` | Delete entry |
-| PUT | `/api/entries/by-date/{date}` | Upsert by date |
-| GET | `/api/stats` | Statistics (min, max, avg, BMI, trend) |
-| GET | `/api/settings` | User settings |
-| PUT | `/api/settings` | Update settings (height, target, unit) |
-| GET | `/api/export` | CSV export |
+## Screens
 
-## Features
+| Screen | Route | Description |
+|--------|-------|-------------|
+| Auth | `/auth` | Register / Login |
+| Dashboard | `/` | Active session, recent workouts, quick stats |
+| Active Workout | `/workout` | Log sets: kg, reps, RIR. Save / finish. Template support. |
+| Session Detail | `/session/[id]` | View past session with volume stats |
+| Exercises | `/exercises` | Browse, create exercises with muscle region |
+| Templates | `/templates` | Workout templates → quick start with pre-filled exercises |
+| History | `/history` | All past sessions, grouped by month |
+| Settings | `/settings` | Profile, password, account deletion |
 
-- Log daily weight
-- View history with interactive chart
-- Track BMI (with height setting)
-- Target weight progress tracking
-- Offline-first: works without backend, syncs when connected
-- kg/lbs toggle
-- Dark mode UI
-- CSV export
+## Architecture
+
+- **expo-router** — file-based routing
+- **AsyncStorage** — auth token persistence
+- **JWT auth** — Bearer token in all API calls, auto-refresh on 401
+- **Offline-first** — not yet implemented (API calls fail gracefully)
+
+## API
+
+All endpoints under `/api/v1/` — see openweightsbackend Swagger at `/docs`.
