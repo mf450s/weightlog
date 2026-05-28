@@ -7,10 +7,27 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "scheme": "openweights",
-    "splash": { "backgroundColor": "#09090B" },
-    "ios": { "supportsTablet": true, "bundleIdentifier": "com.openweights.app" },
-    "android": { "adaptiveIcon": { "backgroundColor": "#09090B" }, "package": "com.openweights.app" },
-    "platforms": ["ios", "android"],
-    "plugins": ["expo-router"]
+    "splash": {
+      "backgroundColor": "#09090B"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.openweights.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#09090B"
+      },
+      "package": "com.openweights.app"
+    },
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "plugins": [
+      "expo-router",
+      "expo-asset",
+      "expo-font"
+    ]
   }
 }

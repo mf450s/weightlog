@@ -3,10 +3,10 @@ import { View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet } from "rea
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { Colors as c } from "../lib/colors";
-import type { SessionSet, ExerciseRead } from "../lib/types";
-import { getSession, listSessionSets, listExercises, deleteSessionSet, deleteSession } from "../lib/api";
-import { Card, Section, StatRow, Badge } from "../components/ui";
+import { Colors as c } from "../../lib/colors";
+import type { SessionSet, ExerciseRead } from "../../lib/types";
+import { getSession, listSessionSets, listExercises, deleteSessionSet, deleteSession } from "../../lib/api";
+import { Card, Section, StatRow, Badge } from "../../components/ui";
 
 export default function SessionDetail() {
   const router = useRouter();
@@ -22,7 +22,7 @@ export default function SessionDetail() {
           listSessionSets(Number(id)),
           listExercises(),
         ]);
-        setSets(s.sort((a, b) => a.set_number - b.set_number));
+        setSets(s.sort((a: SessionSet, b: SessionSet) => a.set_number - b.set_number));
         setExercises(exs);
       } catch {}
       setLoading(false);
