@@ -3,10 +3,10 @@ import { View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet } from "rea
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { Colors as c } from "../lib/colors";
-import type { SessionSet, ExerciseRead } from "../lib/types";
-import { getSession, listSessionSets, listExercises, deleteSessionSet, deleteSession } from "../lib/api";
-import { Card, Section, StatRow, Badge } from "../components/ui";
+import { Colors as c } from "../../lib/colors";
+import type { SessionSet, ExerciseRead } from "../../lib/types";
+import { getSession, listSessionSets, listExercises, deleteSessionSet, deleteSession } from "../../lib/api";
+import { Card, Section, StatRow, Badge } from "../../components/ui";
 
 export default function SessionDetail() {
   const router = useRouter();
