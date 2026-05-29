@@ -5,7 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors as c } from "../lib/colors";
 import type { UserRead } from "../lib/types";
-import { getMe, updateMe, updatePassword, deleteAccount, logout, getCurrentUser } from "../lib/api";
+import { getMe, updateMe, updatePassword, deleteAccount, logout, getCurrentUser, getApiBase, setApiBase } from "../lib/api";
 import { Card, Section, Btn, Input } from "../components/ui";
 
 export default function SettingsScreen() {
@@ -17,6 +17,14 @@ export default function SettingsScreen() {
   const [showPw, setShowPw] = useState(false);
   const [currentPw, setCurrentPw] = useState("");
   const [newPw, setNewPw] = useState("");
+
+  // Server URL
+  const [serverUrl, setServerUrl] = useState("");
+  const [showServerUrl, setShowServerUrl] = useState(false);
+
+  React.useEffect(() => {
+    getApiBase().then(url => setServerUrl(url));
+  }, []);
 
   const handleUpdateProfile = async () => {
     try {
@@ -94,6 +102,32 @@ export default function SettingsScreen() {
                 <View style={{ flexDirection: "row", gap: 8 }}>
                   <View style={{ flex: 1 }}><Btn label="Update" onPress={handleChangePassword} /></View>
                   <View style={{ flex: 1 }}><Btn label="Cancel" variant="ghost" onPress={() => { setShowPw(false); setCurrentPw(""); setNewPw(""); }} /></View>
+                </View>
+              </View>
+            )}
+          </Section>
+        </Card>
+
+        {/* Server URL */}
+        <Card style={{ marginBottom: 16 }}>
+          <Section title="Server">
+            {!showServerUrl ? (
+              <Btn label="Change Server URL" variant="ghost" onPress={() => setShowServerUrl(true)} />
+            ) : (
+              <View>
+                <Text style={styles.label}>API Base URL</Text>
+                <Input value={serverUrl} onChange={setServerUrl} placeholder="http://localhost:8000" style={{ marginBottom: 12 }} />
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  <View style={{ flex: 1 }}>
+                    <Btn label="Save" onPress={async () => {
+                      await setApiBase(serverUrl.trim());
+                      Alert.alert("Saved", "Server URL updated. Restart app to apply.");
+                      setShowServerUrl(false);
+                    }} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Btn label="Cancel" variant="ghost" onPress={() => { setShowServerUrl(false); }} />
+                  </View>
                 </View>
               </View>
             )}

@@ -23,12 +23,40 @@ import type {
 } from "./types";
 
 const STORAGE_KEY = "openweights_auth";
-const BASE = Platform.select({
+const URL_STORAGE_KEY = "openweights_api_url";
+
+const DEFAULT_BASE = Platform.select({
   android: "http://10.0.2.2:8000",
   ios: "http://localhost:8000",
   default: "http://localhost:8000",
 });
-const API = `${BASE}/api/v1`;
+
+let _base: string | null = null;
+
+export async function getApiBase(): Promise<string> {
+  if (_base) return _base;
+  try {
+    const stored = await AsyncStorage.getItem(URL_STORAGE_KEY);
+    if (stored) {
+      _base = stored;
+      return stored;
+    }
+  } catch {}
+  _base = process.env.EXPO_PUBLIC_API_URL ?? DEFAULT_BASE;
+  return _base;
+}
+
+export async function setApiBase(url: string): Promise<void> {
+  _base = url;
+  await AsyncStorage.setItem(URL_STORAGE_KEY, url);
+}
+
+async function apiUrl(): Promise<string> {
+  const base = await getApiBase();
+  return `${base}/api/v1`;
+}
+
+export { URL_STORAGE_KEY as API_URL_STORAGE_KEY };
 
 // ── Auth State ───────────────────────────────────
 
@@ -74,12 +102,13 @@ async function request<T>(
   }
 
   // Try token refresh on 401
-  let res = await fetch(`${API}${path}`, { ...options, headers });
+  const base = await apiUrl();
+  let res = await fetch(`${base}${path}`, { ...options, headers });
   if (res.status === 401 && auth && _tokens?.refresh_token) {
     const refreshed = await rawRefresh();
     if (refreshed) {
       headers["Authorization"] = `Bearer ${_tokens!.access_token}`;
-      res = await fetch(`${API}${path}`, { ...options, headers });
+      res = await fetch(`${base}${path}`, { ...options, headers });
     }
   }
   if (!res.ok) {
@@ -98,7 +127,7 @@ async function request<T>(
 async function rawRefresh(): Promise<boolean> {
   if (!_tokens?.refresh_token) return false;
   try {
-    const res = await fetch(`${API}/auth/refresh`, {
+    const res = await fetch(`${await apiUrl()}/auth/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refresh_token: _tokens.refresh_token }),
