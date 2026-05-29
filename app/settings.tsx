@@ -58,8 +58,8 @@ export default function SettingsScreen() {
           Alert.prompt
             ? Alert.prompt("Password", "Enter your password", [
                 { text: "Cancel", style: "cancel" },
-                { text: "Delete", style: "destructive", onPress: async (pw: string) => {
-                  try { await deleteAccount(pw); router.replace("/"); } catch (e: any) { Alert.alert("Error", e.message); }
+                { text: 'Delete', style: 'destructive', onPress: async (pw?: string) => {
+                  try { if (pw) await deleteAccount(pw); router.replace('/'); } catch (e: any) { Alert.alert('Error', e.message); }
                 }},
               ], "secure-text")
             : Alert.alert("Error", "Prompt not supported.");
